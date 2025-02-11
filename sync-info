@@ -1,0 +1,65 @@
+Syncing Two Folders for Daily Backup
+
+For our daily backup we will use the incremental method since it will be very frequent. We also don’t want to waste disk space, use unnecessary write operations, and CPU cycles by doing a full backup.
+
+To sync one folder to the next we use the following command:
+
+rsync –av /path/to/source /home/mark/rsync/daily
+
+The ‘a’ flag tells rsync to go into archive mode. The ‘v’ option is just verbose (show details).
+
+Now this should copy/sync all of the files from one folder to the other. If the files already exist and they have not been modified since the last time you run this command it will simply copy those files. So basically when you run this command it will backup the files that have changed since the day before.
+
+Adding the –delete flag. By default rsync does not delete files in the backup if they were deleted in the source. This is rsync’s way of protecting you from deleting the entire backup directly on accident. To force rsync to delete files we do this:
+
+$ rsync –av --delete /path/to/source /home/mark/rsync/daily
+
+This will ensure that we are not backing up deleted files.
+
+Warning: When using the –delete flag be sure to check your command twice. If you reverse the source with the destination you will sync your data with an empty folder. You will be left with two empty folders!
+Weekly Sync
+
+For our weekly sync will just sync with the latest daily folder.
+
+rsync –av --delete /home/mark/rsync/daily /home/mark/rsync/weekly
+
+We run this command once a week to maintain our weekly incremental backup. Now if we accidentally deleted something last Tuesday and just noticed it on Friday we will have a backup.
+Full Monthly Backup
+
+Since we are going to keep full monthly backups and they won’t be accessed frequently we can compress them with bzip.
+
+tar -cvjf /home/mark/rsync/monthly/monthly.tar.bz2 daily/
+
+Now since we are archiving our full backups monthly we want to be sure not to over write an existing monthly backup. We will do this by naming each one with the date. Instead of the command above use this one, to add the date to each filename.
+
+tar -cvjf /home/mark/rsync/monthly/monthly_$(date +%Y%m%d).tar.bz2 /home/rsync/daily/
+
+Now you should have all the commands to set up a rotating backup daily, weekly and a full monthly backup. The only thing now is to execute those commands every day, week, and end of the month.
+Automate the Process with Cron
+
+It is not a proper backup solution unless it is automated. We will use cron to set up daily, weekly, and monthly jobs.
+
+Modify your cron schedule:
+
+crontab -e
+
+Now add the following lines of code:
+
+    30 17 * * * rsync –av --delete /path/to/source /home/mark/rsync/daily
+    00 18 * * 5 rsync –av --delete /home/mark/rsync/daily /home/mark/rsync/weekly
+    00 6 1 * * tar -cvjf /home/mark/rsync/monthly/monthly_$(date +%Y%m%d).tar.bz2 /home/rsync/daily/
+
+    This example cron setup will backup daily at 5:30PM.
+    Backup every Friday at 6:00PM.
+    Do the full backup on the first of each month at 6:00AM
+
+For more information on cron see, Learning Cron by Example.
+
+Now you will need to tailor this to the usage patterns of you or your users. You should also allow enough time for the daily backup to finish before doing the weekly. In this example on Fridays I allowed 59 minutes for the daily backup to finish. If you are worried about the sync time running into each other you can schedule your daily backup in the morning and your Friday weekly backup at night.
+
+If you want to find out how long it is currently taking to do a backup add ‘time’ command to the beginning of each command.
+Tell Cron to be Quiet
+
+Cron by default sends emails with the output of the command. If you don’t want to get emails you can pipe the cron comands to /dev/null. Add this to the end of each cron line:
+
+> /dev/null
